@@ -1,1 +1,245 @@
-Set up
+# Local IT Support AI Agent
+
+A FastAPI-based backend for IT helpdesk workflow management with SQLite persistence.
+
+## Features
+
+- **Ticket Management**: Create, update, track, and close IT support tickets
+- **User Management**: Simple user creation and management
+- **Status Transitions**: Enforced valid status transitions (NEW → IN_PROGRESS → RESOLVED → CLOSED)
+- **Audit Logging**: Structured logs for all ticket operations with timestamps
+- **API Documentation**: Auto-generated OpenAPI/Swagger docs
+- **Type Safety**: Full type hints and Pydantic validation
+
+## Tech Stack
+
+- **Python 3.11+**
+- **FastAPI** - Modern, fast web framework
+- **SQLAlchemy** - SQL toolkit and ORM
+- **SQLite** - Lightweight database
+- **Pydantic v2** - Data validation
+- **Pytest** - Testing framework
+
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repo-url>
+cd Local_IT_Support_Agent
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # macOS/Linux
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Initialize database (creates tables and seed users)
+python -m app.db.init_db
+```
+
+### Running the Server
+
+```bash
+# Development server with auto-reload
+uvicorn app.main:app --reload
+
+# Production server
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The API will be available at:
+- **API**: http://localhost:8000
+- **Interactive Docs**: http://localhost:8000/docs
+- **OpenAPI Schema**: http://localhost:8000/openapi.json
+
+## API Endpoints
+
+### Tickets
+
+#### Create Ticket
+```bash
+curl -X POST localhost:8000/api/v1/tickets \
+  -H "Content-Type: application/json" \
+  -d '{"issue":"VPN not working", "assigned_to": 1}'
+```
+
+#### Get Ticket
+```bash
+curl localhost:8000/api/v1/tickets/1
+```
+
+#### List Tickets (with filters)
+```bash
+# List all tickets
+curl localhost:8000/api/v1/tickets
+
+# Filter by status
+curl localhost:8000/api/v1/tickets?status=IN_PROGRESS
+
+# Filter by assigned user
+curl localhost:8000/api/v1/tickets?assigned_to=1
+
+# Pagination
+curl localhost:8000/api/v1/tickets?page=2&page_size=10
+```
+
+#### Update Ticket
+```bash
+# Update status
+curl -X PATCH localhost:8000/api/v1/tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"IN_PROGRESS"}'
+
+# Update issue description
+curl -X PATCH localhost:8000/api/v1/tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{"issue":"VPN connection completely failed"}'
+
+# Reassign ticket
+curl -X PATCH localhost:8000/api/v1/tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{"assigned_to": 2}'
+```
+
+#### Close Ticket
+```bash
+curl -X POST localhost:8000/api/v1/tickets/1/close \
+  -H "Content-Type: application/json" \
+  -d '{"resolution_code":"VPN-RESET-OK"}'
+```
+
+### Users
+
+#### Create User
+```bash
+curl -X POST localhost:8000/api/v1/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"charlie"}'
+```
+
+#### List Users
+```bash
+curl localhost:8000/api/v1/users/
+```
+
+#### Get User
+```bash
+curl localhost:8000/api/v1/users/1
+```
+
+## Data Models
+
+### User
+```json
+{
+  "id": 1,
+  "username": "alice"
+}
+```
+
+### Ticket
+```json
+{
+  "id": 1,
+  "issue": "VPN not working",
+  "status": "NEW",
+  "assigned_to": 1,
+  "logs": [
+    {
+      "timestamp": "2025-08-30T10:00:00Z",
+      "actor": "system",
+      "action": "ticket_created",
+      "details": {"issue": "VPN not working", "assigned_to": 1}
+    }
+  ],
+  "created_at": "2025-08-30T10:00:00Z",
+  "updated_at": "2025-08-30T10:00:00Z"
+}
+```
+
+## Status Transitions
+
+The system enforces the following valid status transitions:
+
+- **NEW** → **IN_PROGRESS**
+- **IN_PROGRESS** → **RESOLVED**
+- **RESOLVED** → **CLOSED** (via close endpoint)
+- **RESOLVED** → **IN_PROGRESS** (re-open)
+- **CLOSED** → *(no transitions allowed)*
+
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app
+
+# Run specific test file
+pytest tests/test_tickets.py
+
+# Run specific test
+pytest tests/test_tickets.py::TestTickets::test_create_ticket
+```
+
+## Development
+
+### Project Structure
+
+```
+app/
+├── main.py              # FastAPI application entry point
+├── api/
+│   └── routers/
+│       ├── tickets.py   # Ticket route handlers
+│       └── users.py     # User route handlers
+├── core/
+│   └── config.py        # Application configuration
+├── db/
+│   ├── models.py        # SQLAlchemy models
+│   ├── schemas.py       # Pydantic schemas
+│   ├── session.py       # Database session
+│   └── init_db.py       # Database initialization
+├── services/
+│   └── tickets.py       # Business logic for tickets
+└── utils/
+    └── logging.py       # Logging utilities
+tests/
+├── test_tickets.py      # Ticket tests
+└── test_users.py        # User tests
+```
+
+### Adding New Features
+
+1. **Models**: Update `app/db/models.py` for database schema changes
+2. **Schemas**: Add/update Pydantic models in `app/db/schemas.py`
+3. **Services**: Implement business logic in `app/services/`
+4. **Routes**: Add API endpoints in `app/api/routers/`
+5. **Tests**: Write tests in `tests/`
+
+## Demo Data
+
+The application seeds with two demo users:
+- **alice** (ID: 1)
+- **bob** (ID: 2)
+
+Use these for testing ticket assignments.
+
+## Production Considerations
+
+- **Database**: Replace SQLite with PostgreSQL for production
+- **Authentication**: Add JWT or session-based authentication
+- **Logging**: Configure structured logging with proper log levels
+- **Error Handling**: Add global exception handlers
+- **Rate Limiting**: Add API rate limiting
+- **Health Checks**: Implement comprehensive health endpoints
+- **Metrics**: Add application metrics (Prometheus, etc.)
+
+## License
+
+MIT License
